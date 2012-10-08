@@ -1,0 +1,666 @@
+%\RequirePackage{lineno}
+\documentclass[number,1p,12pt]{elsarticle}
+% for printing purposes
+\addtolength{\textwidth}{2in}
+\addtolength{\textheight}{2in}
+\addtolength{\evensidemargin}{-1in}
+\addtolength{\oddsidemargin}{-1in}
+\addtolength{\topmargin}{-1in}
+
+%\documentclass[a4paper,10pt,draftclsnofoot,onecolumn]{IEEEtran}
+%\documentclass[a4paper,10pt,twocolumn]{IEEEtran}
+%\usepackage[top=10pt, bottom=10pt, left=20pt, right=20pt]{geometry}
+%\usepackage[utf8x]{inputenc}
+\usepackage{subfig}
+\setlength{\columnseprule}{0pt}
+\usepackage{graphicx}
+\usepackage{algpseudocode}
+\usepackage{algorithm}
+\usepackage{amsfonts}
+\renewcommand{\qed}{\hfill \ensuremath{\Box}}
+%\renewcommand\theequation{\textbf{\arabic{equation}}}
+\newcommand{\bref}[1]{{\bf\ref{#1}}}
+%\usepackage{draftwatermark}
+\usepackage{amssymb,amsmath,mathptmx,amsbsy,bm}
+\usepackage{setspace}
+\usepackage{color}
+\renewcommand{\thefootnote}{\fnsymbol{footnote}}
+
+%\SetWatermarkText{DRAFT}
+%\SetWatermarkLightness{0.9}
+%\SetWatermarkScale{0.7}
+
+\journal{Information Sciences}
+
+\begin{document}
+\begin{frontmatter}
+
+\title{SAGA: A Novel Signal Alignment Method Based on Genetic Algorithm}
+
+ \author{H\"useyin Kaya$^{\text{a},}\footnote{Corresponding author. Istanbul Technical University, Istanbul, Turkey, Tel.: +90 555 6218176, hkayabilisim@gmail.com.}$ and
+ \c Sule G\"und\"uz \"O\u g\"ud\"uc\"u$^{\text{b}}$
+ }
+ \address[label1]{Istanbul Technical University, Informatics Institute, Turkey.}
+ \address[label2]{Istanbul Technical University, Computer Engineering Department, Turkey.}
+
+
+\begin{abstract}
+Signal alignment is one of the most commonly used strategies in analyzing a group of time series in order to learn the variations or common patterns across individual signals. A pairwise alignment algorithm aligns two signals by warping the time axis of the first signal so that the warped signal is ``near" to the second.  The majority of alignment algorithms are focused on extracting features like the locations of significant peaks or peak widths, and using those features in aligning the signals instead of raw signal. Although this approach allows fast alignments, it suffers from the risk of missing important features, leading to inaccurate alignments. In this paper, a novel \textbf{S}ignal \textbf{A}lignment method based on \textbf{G}enetic \textbf{A}lgorithm (SAGA) is proposed to align raw signals by first modeling the warping function with an ODE model. The parameters of the warping function are then optimized by using Genetic Algorithm. The SAGA does not require feature extraction and it preserves the smoothness of the signals. The performance of the proposed method is evaluated on two sets of synthetic and the real world datasets and compared to the well-known alignment algorithms. The results show that the SAGA is a powerful algorithm that can compete with the others.
+\end{abstract}
+
+\begin{keyword}
+Signal Alignment, Genetic Algorithm, Time Warping
+\end{keyword}
+
+\end{frontmatter}
+%\linenumbers
+
+\section{Introduction}
+Time series is one of the common data types encountered in many applications. It can be obtained by periodically measuring the height of a child \cite{Ramsay1998} or it can be an outcome of a sophisticated device such as a DNA sequencer \cite{Sanger1977} or a Mass Spectrometry \cite{Bylund2002}. In either case, a time series is a list of measurements obtained by observing an event over time. The variations or patterns in the data usually carry useful information about the investigated subject. For example, height measurements describe the growth rate of children or the data produced by a DNA sequencer indicate the DNA sequence of a patient under inspection.
+
+Processing a single time series and extracting useful information out of it are well-known research topics and deserve an attention on their own. A simple example is to create 4-nucleotide sequence by analysing the time series provided by DNA sequencers \cite{Ewing1998}. However more interesting problem is to analyze a group of time series in order to learn the variations or common patterns across the individuals. Extracting those information about the group may provide better understanding on the investigated study.  Analyzing a set of growth profiles of male and female children \cite{Thalange1996}, detecting changes in peptide/protein abundances in samples \cite{Akella2009} or comparing a group of DNA sequence to a reference \cite{Bonfield1998} are such examples. 
+
+Many techniques used in analysis of multiple time series assume that they are ready to make a side by side comparison. For example one may want to cluster the time series into distinct groups by assuming that the location of a peak common in all time series are at the same time point. However shifts in time series is a common phenomena in many application fields. Shifts which is also called as time drifts or retention time difference can be highly non-linear because of imperfections of measurement device or differences in the  examined subjects. Therefore it is often necessary to correct the time drifts between the time series. It involves stretching or compressing time axis of one or more time series so that the resulted series are ready to analysis. This is called an alignment.
+
+There are two basic strategies in alignment a group of time series. In the first approach, alignment is carried out by using the features extracted from raw data. These features are then used to align original raw data.  
+Conventional mutation screening fits very well to this description \cite{Mott1998}, \cite{Nickerson1997}. The raw data (signal) generated by DNA sequencers are first processed to obtain 4-nucleotide DNA sequence (features), then these  string sequences are aligned. Another application field is the alignment of chromatographic profiles which stems from Gas/Liquid Chromatograph-Mass spectrometry (MS) platform for the profiling of certain classes of small molecules in biological samples. In this type of data, the locations of prominent peaks are called feature vectors which are generally obtained by finding the points at which the first and second derivatives are zero and positive, respectively. Feature vectors can then be aligned by various procedures including Dynamic Programming (DP) \cite{Robinson2007} and fuzzy matching approach \cite{Walczak2005}. A detailed review on signal alignment based on extracted features can be found in \cite{Aberg2009}.The advantage of this approach shows itself in the name of speed since the transformation reduces data size which allows a faster analysis. However it also has an important drawback; the risk of missing a feature resulting misleading conclusions in later steps. For example, during the generation of DNA sequences, a single false nucleotide assignment may lead to an erroneous diagnosis of the patient. 
+
+The second strategy depends on the idea of using raw data throughout the entire comparison study in order to eliminate the risk of incorrect feature extraction of the first approach \cite{Crowe2005,Manaster2005,Mott1998}. The alignment of raw signals is achieved by ``warping'' the time axis of one or both of the signals so that the two signals are forced to ``close'' to each other in the sense that the Euclidean distance between them is small. Warping is defined as nonlinear stretching and compressing the signal along the time axis. 
+
+The clock analogy is very useful to further understand this phenomena. Consider two people observing the same event and recording the outcomes by using the time displayed in their individual clocks namely A and B as shown in Fig.~\ref{Figure00}. If there is no time difference between A and B, then the recorded observations will be identical. However, there will be differences between the signals depending on the amount of time drifts which can be modelled by a strictly monotone increasing function which is called a ``warping function'' mapping the time in A to the time in B. If one knows the warping function, then it can be used to align the two signals by applying its inverse only to the second signal. In this way, the time axis of the second signal is corrected to match that of the first. In other words, we can say that only the clock B is adjusted to create a synchronization between the clocks. Likewise, if one apply the warping function to the first signal and keep the second signal fixed, then the time axis of the first signal is corrected to match that of the second. This is equivalent to adjust only the first clock A to create a synchronization. These  two cases are examples of asymmetric alignment since only one of the signals is warped. In symmetric case both signals are warped to create an alignment. This is equivalent to make adjustments in both clocks.  The symmetric case is further explained in Theory section.
+
+
+Aligning a pair of signals as in the above example is called as ``pairwise alignment". Aligning more than two signals are called as ``multiple alignment" and it can be achieved by doing a series of pairwise alignments. One of the signals can be chosen as a ``reference", then the other signals are pairwise aligned to the reference one at a time. The average of the signals can be chosen as a reference. It is also possible to create a representative signal by assuming that each time series is generated as a noisy transformation of a single signal called as a ``latent trace'' which can be obtained by Continuous Profile Model (CPM)  \cite{Listgarten2005}. CPM has difficulties in aligning signals longer than $1000$ points and not meaningful for just a pair of signals.  Therefore it is not used for comparison purposes in the experimental part of this study. From now on, an alignment represents pairwise alignment unless otherwise stated.
+
+The stated optimization problem to the signal alignment has been a major interest to the community for nearly half a century. The vast majority of the methods developed in this era are built on Dynamic Programming (DP) \cite{Bellman2003} that lends itself to the creation of cost matrices which becomes a liability in the alignment of long signals. It also generates non-smooth warping functions resulting sudden jumps in the alignment. Many attempts have been made to solve these problems, but none of them achieved both objectives. 
+
+\begin{figure}
+\centering
+\subfloat[Two different observations of an event]{\includegraphics[]{ClockI.pdf}}\hspace{1cm}%
+\subfloat[Asymmetric alignment]{\includegraphics[]{ClockII.pdf}}\hspace{1cm}%
+\subfloat[Symmetric alignment]{\includegraphics[]{ClockIII.pdf}}
+\caption{(a) Same event is measured by two independent observers with clocks A and B, respectively. Resultant time series are A and B.  (b) In asymmetric alignment, warping is only applied to one of the signals. (c) In symmetric case, both time series are warped.  }
+\label{Figure00}
+\end{figure} 
+
+In this paper, we introduced a new signal alignment algorithm, \textbf{S}ignal \textbf{A}lignment method based on \textbf{G}enetic \textbf{A}lgorithm (SAGA) to overcome the limitations of aforementioned methods namely (1) non-smoothness of the warping functions (2)  quadratic space and time complexity. In order to achieve the smoothness, the warping function is modelled by an Ordinary Differential Equation (ODE) combined with a weight function which allows rapid changes in curvature \cite{Ramsay1998a}. Any solution of ODE is guaranteed to be smooth and strictly increasing. A rich set of warping functions can be produced by using specially designed weight functions which can be optimized to find an optimum warping function in the course of pairwise signal alignment. Genetic Algorithm (GA) is a powerful method to solve this kind of optimization problems especially when the derivative of the fitness function is not available. To our best knowledge, combination of GA and the ODE model has never been used to align two signals.
+
+Our method has two advantages; (1) we employ an ODE model to produce smooth and strictly increasing warping functions. This model not only results in a smooth warping function but also enables the alignment of signals without extracting features. (2) We use the genetic algorithm for estimating the model parameters of warping function, which ensures to align long signals without increasing memory requirements. Indeed, the time and space complexity of SAGA is linear. The results on synthetic data sets show that our method can effectively align signals providing smooth warping functions with low memory requirements. We also evaluate our method on real data sets to show that the proposed approach scales and provides effective alignment of long signals.
+
+The rest of the paper is organized as follows. We introduce the related work in Section 2 and define the properties of warping functions in Section 3. Details of the method are given in Section 4. We have compared the performance of our algorithm with other state of the art alignment algorithms and evaluate the performance in Section 5. Finally, we conclude with an analysis of our results and point out future work in Section 6.
+
+\section{Related work}
+The first approaches to the signal alignment problem consist of simple shifting mechanisms which are mostly ineffective due to the non-linear nature of warpings. Dynamic Time Warping (DTW) is developed to find an optimum solution to the non-linear time-normalization problem for a pair of speech pattern \cite{Sakoe1978}. DTW is able to produce a non-linear warping by solving the optimization problem via Dynamic Programming (DP). In DTW, first a cost matrix is created by computing the correspondence distances between every possible pair of points in the signals. It is then fed into DP to get an optimum path traversing along the diagonal. The term ``path'' is deliberately used since the solution may not satisfy the requirements of a ``function'' depending on the data and/or constraints. The key point of the algorithm is to put some constraints on warping path. First of all, a valid path must be monotone increasing in order to prevent warping in negative time direction. Secondly a slope constraint in which all valid transitions from a point in the warping path to another point such the maximum number of consecutive horizontal,vertical or diagonal transitions should be defined. DP is constructed based on these constraints, so the optimum solution depends on slope constraints. Being a deterministic procedure and ability to find global optimum make DTW a major technique in the field. However, it has quadratic space and time complexity leading memory problems regarding long time series data. Several methods, including Correlation Optimized Warping (COW) \cite{Nielsen1998}, Fast Dynamic Time Warping (FDTW) \cite{Salvadora2007}, Genetic Time Warping (GTW) \cite{Kwong1996}, and DTW-Significance (DTW-S) \cite{Yuan2011} have been proposed to overcome the limitations of DTW.
+
+COW is a divide and conquer algorithm in which the signals are divided into shorter segments each warped linearly. The number of segments in both target and reference signals are same whereas the maximum length increase or decrease in a target segment is controlled by a slack parameter $t$. If the length of a target segment is different than corresponding reference segment, then the former is linearly interpolated in order to create a segment of equal length. COW breaks down the global alignment problem into a segment-wise correlation optimization problem by means of DP. Further explanation with instructive examples can be found in Tomasi \cite{Tomasi2004}. COW is able to reduce the quadratic space complexity of DTW to $O(mn)$ where $m$ is is the number of segments and $n$ is the length of the signals. However it has the time complexity of $O(mn^3)$ \cite{Smith2009}. COW is an asymmetric method as it keeps one of the signals fixed. Shorted Correlation Optimized Warping (SCOW) is recently introduced to make it symmetric as it allows both signals warped in an iterative fashion with the same space and time complexities \cite{Smith2009A}. 
+
+Another attempt to eliminate the weaknesses of DTW is Fast Dynamic Time algorithm (FDTW) which avoids to use full-size cost matrix involved in DP by means of a multilevel approach. In FDTW, the signals are initially sampled down to a very low resolution. A warping is found for this resolution and projected onto an incrementally higher resolution. Projected warp is then refined and projected again to a higher resolution. This step is repeated until a warp path is found for the full resolution time series. Working with smaller matrices enables FDTW to solve large problems not manageable by conventional DTW. 
+
+Genetic Time Warping (GTW) copes with the quadratic time and space complexity of DTW by approaching to the alignment problem in a more direct way. It first creates a set of candidate solutions called as initial population by creating random warping paths. The fitness of each warping path (individual) in the population is evaluated by first applying the warping to the signals and calculating the similarity of warped signals. A new population is created by applying the general principles of Genetic Algorithm (GA). A mutation is defined by randomly modifying a small segment in the warping path. A crossover is also defined by exchanging segments between two warping paths to produce a new individual. Selection mechanism of GTW is the roulette wheel selection scheme. Having defined all the fundamental definitions of GA, the optimum solution is obtained by a simple iteration in which selection, mutation and crossover operators are applied to the current generation. Best fitted individual in the last generation is taken as the final solution to the alignment. 
+
+The methods COW, FDTW and GTW can cope with the problems arising in very long time series, but they are susceptible to a DTW-related complication namely non-smoothness in the warping paths. In these methods as well as DTW, there is no mechanism controlling the smoothness of the warping function. Therefore the paths contain sharp corners leading to stair-case patterns in the alignments. Although the slope constraints have some control over the shape of the warping path, they do not impose smoothness and are not enough to control the curvature.
+
+These drawbacks are eliminated by Parametric Time Warping (PTW) which proposes a quadratic polynomial in order to model the warping function \cite{Eilers2004}. The coefficients of the polynomial are optimized using regression. The advantage of this approach is to preserve the smoothness of the warping which is crucial to prevent sudden jumps or corners often seen in DTW-bases alignments. Although PTW has a linear space and time complexity,  it has a weakness in the ability of modelling complex warpings. A quadratic polynomial is not ``rich'' enough to model a function with rapid curvature changes which are observed in the real world time series. Increasing the order of the polynomial is not feasible due to the numerical overflow problems and the lack of curvature control mechanism. 
+
+Our alignment algorithm is different from aforementioned methods in that the signal alignment problem is solved by modelling the warping function by ODE and its parameters are determined by GA. This approach provides a smooth warping function and prevents memory problems when aligning long signals, which to our knowledge is a novel concept in signal alignment.
+
+\section{Theory}
+The main objective of most algorithms developed for alignment of time series is to correct non-linear time drifts occurred between signals, which are originated from the same source of event. More specifically, alignment algorithms assume that an observed signal $f_i$ is generated from a single hidden model function $H$ as follows:
+\begin{equation}
+ f_i(t)=H \circ u_i (t)
+\end{equation}
+where $u_i$ is an unknown warping function causing non-linear variations \cite{Ramsay1998a}. In other words, a warping function transforms a function in model space into another function in observation space as visualized in Fig.~\ref{Figure01}. 
+
+\begin{figure}
+\centering{\includegraphics[width=0.5\columnwidth]{Figure01-crop.pdf}}
+\caption{The graphical representation of the relation between the model and observed signals. The signals $f_1$ and $f_2$ in the observation space are obtained by applying the warping functions $u_1$ and $u_2$ to the underlying model $H$. Alignment of the signals $f_1$ and $f_2$ is achieved by determining the inverse warping functions $v_1$ and $v_2$ such that the resulting signals $g_1$ and $g_2$ are ``close" to each other. }
+\label{Figure01}
+\end{figure} 
+
+Alignment algorithms start with the observed signals $f_1$ and $f_2$ and find the optimum inverse warping functions $v_1$ and $v_2$ so that the resulting functions $g_1$ and $g_2$ are near to each other. In other words alignment algorithms make approximations to the inverse of the real warping functions; $v_i\approx  u_i^{-1}$. 
+
+The performance of an alignment algorithm depends on the ability to determine the warping functions. If the algorithm successfully learns the exact individual warping functions $v_i = u_i^{-1}$, then it can find the original model, $H$, by applying $v_i$ to the original signal, $f_i$, which implies a perfect alignment as follows:
+\begin{eqnarray}
+g_i(t) & = & f_i\circ v_i(t)  \nonumber \\
+         & = & f_i\circ u_i^{-1}(t) \nonumber \\
+         & = & H\circ u_i\circ u_i^{-1} (t) \nonumber \\
+         & = & H.
+\end{eqnarray}
+Fortunately, it is not necessary to learn the exact warping functions in order to create a ``good'' alignment as indicated in the following remark.
+
+{\bf Remark }
+Let $H(t)$, $u_i(t)$ and $f_i(t)$ be the model, warping and observed functions, respectively. Further assume that the observed signals are produced by warping the model function as
+$$ f_i(t) = H\circ u_i(t).$$ 
+If an alignment algorithm produces inverse warping functions 
+$$ v_i(t)  = (u_i\circ w)^{-1}(t) $$
+for some invertible function $w(t)$, then $g_i(t) = H\circ w^{-1}(t)$ provided that $w\circ u_i=u_i\circ w$.
+
+{\bf Proof }
+In order to find the aligned signals, $g_i$, the inverse warping functions, $v_i$, are applied to the observed signals as follows:
+\begin{eqnarray}
+g_i(t)                 & = & f_i  \circ v_i(t) \nonumber\\
+                         & = & f_i  \circ (u_i \circ w)^{-1}(t) \nonumber\\
+                         & = & f_i  \circ (w \circ u_i)^{-1}(t) \nonumber\\
+                         & = & f_i  \circ u_i^{-1}\circ w^{-1}(t) \nonumber\\
+                         & = & H\circ u_i \circ u_i^{-1}\circ w^{-1}(t) \nonumber\\
+                         & = & H\circ w^{-1}(t). 
+\end{eqnarray}
+In conclusion, the observed signals are transformed into a single function $g = H\circ w^{-1}$ which proves the remark.
+
+In the light of the remark, we can safely set the first warping function $v_1=t$ to be identity and focus on determining the second. In this way the number of unknown functions are reduced to one at the expense of losing the possibility of finding the underlying real model. Our method SAGA, COW and PTW follow this principle whereas DTW tries to find both functions at the same time. Therefore in order to compare the performances in learning the true warping functions, one has to investigate the combination of them instead of doing individual analysis.
+
+\section{Method}
+\subsection{Modelling the warping function}
+It is well known that a warping function, $u$, plays a role in warping the time axis of a specific observation into another. In this context, it can be considered as a time conversion tool. Therefore, any such function should be invertible, hence strictly increasing. The warping function also has to be smooth in order to prevent sudden jumps. Every such function can be described by a homogeneous linear ordinary differential equation (ODE)
+\begin{equation}
+ u''(t) = w(t)u'(t) \label{eq:1}
+\end{equation}
+where $w$ is simply $D^2u/Du$ or the ``relative curvature" of $u$ \cite{Ramsay1998a}. 
+Eq.~\ref{eq:1}, subject to the boundary conditions $u(0)=0$ and $u(1)=1$, has the solution
+\begin{equation}
+ u(t) = CD^{-1}\{\exp(D^{-1}w)\}(t) \label{eq:2}
+\end{equation}
+where 
+\begin{equation}
+D^{-1} f(t) =  \int_0^t f(s)ds \label{eq:3}
+\end{equation}
+is the partial integration operator, and $C=u(1)/D^{-1}\{\exp(D^{-1}w)\}(1)$. Although there is a solution in a closed form, it is not always possible to produce an explicit expression for different weight functions, $w$. The solution to Eq.~\ref{eq:1} is simply the straight line $u(t)=t$ if $w=0$. Another solution can be found as
+\begin{equation}
+u(t)= (\exp(wt)-1)/(\exp(w)-1)
+\end{equation}
+if the weight function $w$ is set to be a constant. In this paper, the weight is chosen as a linear combination of B-spline bases with order 1
+\begin{equation}
+ w(t)=\sum_{k=1}^nc_kB_k(t) \label{eq:4}
+\end{equation}
+since it allows to have an explicit solution. The coefficients, $c_k$, represent the relative curvatures of each B-spline. 
+
+In order to solve the ODE with B-spline weight function, the interval $[0\;1]$ is first divided into $n$ disjoint regions each of which has length $h=1/n$. The resulting weight function is then
+\begin{equation}
+w(t) = \left\{
+\begin{array}{ll}
+ c_1 & t\in [0\;h)\\
+ c_2 & t\in [h\;2h)\\
+ \vdots & \vdots \\
+ c_{n-1} & t\in [(n-2)h\;(n-1)h)\\
+ c_n & t\in [(n-1)h\;1].
+\end{array}
+\right. \label{eq:5} 
+\end{equation}
+The solution is then found as
+\begin{equation}
+u(t)  =  \left\{
+\begin{array}{ll}
+ u_1(t) & t\in [0\;h)\\
+ u_2(t) & t\in [h\;2h)\\
+ \vdots & \vdots \\
+ u_{n-1}(t) & t\in [(n-2)h\;(n-1)h)\\
+ u_n(t) & t\in [(n-1)h\;1].
+\end{array}
+\right.
+\end{equation}
+where $u_i(t) =  a_i + b_i\exp({c_it})$, and $a_i$ and $b_i$ are the constants to be determined by the following boundary conditions 
+\begin{eqnarray}
+ u_1(0)          & = & 0 \\
+ u_n(1)          & = & 1 \\
+ u_i(ih)  & = & u_{i+1}(ih),\quad i=1,\ldots,n-1 \\
+ u_i'(ih)  & = & u_{i+1}'(ih),\quad i=1,\ldots,n-1 .
+\end{eqnarray}
+There are $2n$ equations and $2n$ unknowns which can be arranged into a linear system of equations, $Ax=b$. The system can then be solved by a standard LU factorization scheme. A few examples of warping functions obtained by this procedure are presented in Fig.~\ref{Figure02}. Please note that all warping functions starts from $[0,0]$ and goes up to $[1,1]$. This was constrained by the boundary conditions of the ODE. Additionally, please not that all functions are also monotone increasing. 
+
+\begin{figure}
+\centering{\includegraphics[width=0.5\columnwidth]{Figure02-crop.pdf}}
+\caption{A rich family of warping functions can be created by using the ODE model given in Eq.~\ref{eq:1} with B-spline weight function. The functions in this figure are obtained by randomly setting the coefficients in the weight function and solving the ODE. Please note that all functions are smooth and strictly increasing.}
+\label{Figure02}
+\end{figure} 
+
+\subsection{Fitness function}
+Modelling the warping function should be accompanied by choosing a measure to evaluate the ``closeness'' of the warped signals. A natural measure of goodness is the familiar integral of squares of differences
+\begin{equation}
+J(v) = \int_0^1 \left(f_1(t)-f_2(v(t))\right)^2 dt
+ \label{eq:6}
+\end{equation}
+where the functions $f_1$ and $f_2$ are the observed signals and $v$ is the warping function searched for. The fitness function is equivalent to calculating the distance between $g_1$ and $g_2$ as illustrated in Fig.~\ref{Figure01}. The overall curvature of the warping function, $v$, depends on the weight coefficients, $c_i$, which represent the relative curvatures of the warping function in each region. For given observed signals $f_1$ and $f_2$, our purpose is to find optimum warping function hence the optimum coefficients, $c_i$. 
+
+\subsection{SAGA}
+The proposed method utilizes Genetic Algorithm (GA) as an optimization algorithm to find the best warping path. The problem should be represented in an appropriate way for GA domain. First of all, one needs a mechanism to encode a warping path as a chromosome. Then a fitness function should be defined. Lastly, crossover and mutation operators as well as a selection mechanism should be defined. 
+
+{\bf Encoding:} A warping path is created by solving the ODE in Eq.~\ref{eq:1} with a suitable  weight function. We use a linear combination of B-spline bases for this purpose. Each coefficient ($c_k$) which also represents the relative curvature of the corresponding B-spline base is considered as a gene. A chromosome is the collection of $n$ coefficients. Since the genes are free to vary in $R$, a chromosome can be considered as a point in $R^n$ space. 
+
+{\bf Individual:} A collection of $n$ genes is called as an individual which has the same meaning of a chromosome in this study. An individual should be regarded as a warping function satisfying the ODE model. 
+
+{\bf Fitness:} The fitness of an individual is calculated by first applying the corresponding warping function of the individual to the target signal. Euclidean distance of the resultant signal to the reference is then regarded as the fitness function. An optimal warping path yields a distance close to zero, hence our aim is to minimize the fitness function. 
+
+{\bf Selection:} The selection mechanism chooses parents using a stochastic universal sampling strategy which draws a line. Each parent corresponds to a section of the line whose length is proportional to its scaled value. The algorithm then moves along the line in steps of equal size. At each step, the algorithm allocates a parent from the section it lands on. The first step is a uniform random number less than the step size.
+
+{\bf Crossover:} A scattered crossover function is applied which creates a random binary vector and selects the genes where the vector is a 1 from the first parent, and the genes where the vector is a 0 from the second parent, and combines the genes to form the child. 
+
+{\bf Mutation:} Mutation function is chosen as Gaussian which adds a random number taken from a Gaussian distribution with mean 0 to each entry of the parent vector. The algorithm shrinks the standard deviation linearly in each generation. It reaches 0 as the last generation is reached. 
+
+GA starts with creating a random set of individuals which is called initial population. In each generation the population is gradually changed by first selecting the best individuals from which new individuals are created by crossover and mutation operations. Least-fit individuals are replaced with the newly generated individuals. This procedure is terminated until a time limit is exceeded or average fitness of the population doesn't change significantly through generations. There are basically two termination condition to stop GA; (1) the maximum number of generations and (2) tolerance threshold. GA stops producing more generations if the number of generations produced so far is higher than a threshold or cumulative change in fitness function is less than tolerance threshold.  Overall algorithm is presented in Alg.~\ref{GA}.
+
+
+\begin{algorithm}
+\caption{Genetic Algorithm}\label{GA}
+\begin{algorithmic}[1]
+\Procedure{GA}{} 
+\State Choose initial population 
+\State Evaluate the fitness of each individual in that population
+\State Repeat until termination (max. number of generation, change in fitness.)
+\State $\hspace{10pt}$ Select the best-fit individuals for reproduction
+\State $\hspace{10pt}$ Breed new individuals through crossover and mutation
+\State $\hspace{10pt}$ Evaluate the individual fitness of new individuals
+\State $\hspace{10pt}$ Replace least-fit population with new individuals
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+
+GA is used to minimize the fitness function $J$ with respect to the real-valued coefficients $c_i$ which are the design parameters of the optimization problem. They are free to vary in zero centred range such as $[-1\;1]$. They represents the relative curvatures of warping function. Inside the fitness function, the parameters are first used to create the warping function which is then applied to one of the signals. It finally evaluates the Euclidean distance of warped signal to the other signal. In terms of GA, one can regard a design parameter (relative curvature) as a gene and the collection of them (warping function) as an individual. In the light of these definitions, the fitness function evaluates the fitness of a warping function. 
+
+The space complexity of SAGA is linear since it does not use a cost matrix as it is the case in DTW. Time complexity of SAGA is determined by measuring the maximum number of fitness function evaluations. If the maximum number of generations, population size and other GA related parameters are fixed, then the maximum number of fitness function evaluations will not change when the length of signals are doubled. However the time needed to evaluate a single fitness function call will be twice longer because of calculating the distance between the reference signal and the warped signal. Therefore the time complexity is determined to be linear.
+
+It is often also desirable to know the convergence rate of GA. Unfortunately stochastic nature of GA makes it difficult to give a universal convergence rate valid for all data types and objective functions. However it is proved that a specific version of GA with uniform mutation operator on a sphere function has log-linear convergence rate \cite{Auger2005}.
+
+Our method, SAGA, is composed of the ODE model, the fitness function and the GA. It's aim is to determine the optimum inverse warping functions, $v_1$ and $v_2$ for given two input signals $f_1$ and $f_2$ with length $m$. The SAGA assumes $v_1 = t$ by definition and focuses only on $v_2$ which implies that only the second signal is warped. The second warping function is found by solving $\min_{v_2} \int (f_1(t)-f_2(v_2(t))))^2dt$ via GA. The continuous fitness function is discretized as follows:
+\begin{equation}
+J(v_2) = \sum_{j=1}^m \left( f_1(t_j) - f_2(v_2(t_j))\right)^2
+\end{equation}
+where $t_j = (j-1)/(m-1)$. The values of the function $f_2$ are calculated by linear interpolation. The design variable $v_2$ is progressively changed throughout the optimization by changing first the weight coefficients and solving the ODE. The fitness function is minimized via GA to find the optimum weight coefficients hence optimum warping function. The space complexity of SAGA is linear since it does not store a matrix like the one in DTW. Time complexity is also linear if the number of design parameters and GA related parameters such as the maximum number of generations and population size are fixed but the signal length is increased. The overall algorithms is given in Alg.~\ref{SAGA}. The software is also publicly available on-line \footnote{The implementation of the SAGA can be downloaded from http://www.be.itu.edu.tr/~huseyin.kaya/saga.}.
+\begin{algorithm}
+\caption{Signal Alignment via Genetic Algorithm}\label{SAGA}
+\begin{algorithmic}[1]
+\Procedure{SAGA}{$f_1,f_2,n,m$} 
+ \State $\textbf{input}: f_1$ \Comment{First signal}
+ \State $\textbf{input}: f_2$ \Comment{Second signal}
+ \State $\textbf{input}: n$ \Comment{Number of disjoint regions}
+ \State $\textbf{input}: m$ \Comment{Length of signals}
+ \State $\textbf{output}: g_1,g_2$ \Comment{Aligned signals}
+ \State $\textbf{output}: v_1,v_2$ \Comment{Inverse warping functions}
+ \State $t_j=(j-1)/(m-1)$ \Comment{Time discretization}
+ \State $\hat{f}_2(s) = \mbox{INTERP}(\mathbf{t},f_2,s)$ \Comment{Continuous version of $f_2$ by interpolation}
+ \State $v(s|\mathbf{c}) = \mbox{ODE}(s|n,\mathbf{c})$ \Comment{Declaration of inverse warping function}
+ \State $J(\mathbf{c}) = \sum_{j=1}^m (f_{1,j}-\hat{f}_2(v(t_j|\mathbf{c})))^2$ \Comment{Fitness function with Euclidean distance}
+ \State $\hat{\mathbf{c}} = \min_{\mathbf{c}} J(\mathbf{c})$ \Comment{Optimization with GA}
+ \State $v_{1,j} = t_j$ \Comment{Identity inverse warping $v_1$}
+ \State $v_{2,j} =  v(t_j|\hat{\mathbf{c}})$ \Comment{Inverse warping $v_2$}
+ \State $g_{1,j} = f_{1,j}$ \Comment{First signal is not warped}
+ \State $g_{2,j} = \hat{f}_2(v_{2,j})$ \Comment{Second signal is warped}
+ \State $\textbf{return}$ $v_1,v_2,g_1,g_2$  \Comment{Return warpings and aligned signals}
+ \EndProcedure
+ \end{algorithmic}
+\end{algorithm}
+
+\section{Results and discussion}
+In this section, we present the results of an extensive study we have conducted to evaluate the effectiveness of the SAGA as a signal alignment method and compare it with other methods, namely DTW, COW and PTW. The reason to select DTW and COW is that they are extensively used in alignment studies. PTW is also selected for comparisons because it can also preserve smoothness. We conducted our experiments on both synthetic and real datasets. The first experiment on synthetic datasets aims to demonstrate the performance of the alignment methods to model the warping function. The second experiment is a multiple alignment study to compare the performances of the methods in aligning more than two signals. In the third and fourth experiments on real datasets we studied in more detail the performance of the signal alignment methods in aligning long signals.
+
+\subsection{Evaluation method}
+Although signal alignment is broadly used in many applications, there is still no widely accepted objective function for evaluating the goodness of alignment \cite{Listgarten2007a}. A straightforward measure is to calculate the average standard deviations across all time series. Let $\mathbf{F}=\{\mathbf{f}_1,\ldots,\mathbf{f}_n\}$ be a set of time series where $\mathbf{f}_i = \{ f_{i,1},\ldots,f_{i,m}\}$. Then the alignment score of $\mathbf{F}$ is defined as the mean of point-wise standard deviations across all the time series as follows:
+\begin{equation}
+Score(\mathbf{F}) = \frac{1}{m}\sum_{j=1}^m \sqrt{\frac{1}{n}\sum_{i=1}^n \left[ f_{i,j}-\frac{1}{n}\sum_{k=1}^n  f_{k,j}\right]^2}.
+\label{eq1DScore}
+\end{equation}
+
+The alignment score can be used to observe the effect of an alignment procedure by calculating the score of the signals before and after alignment. The score calculated after alignment is usually expected to be lower than the score calculated before alignment.  The scores can also be used in statistical significance tests in which same alignment problem is solved many times with different random seeds. The scores obtained by SAGA are not expected to be different from each other since it is a stochastic method. Whereas, DTW, COW and PTW are guaranteed to produce same scores since they are deterministic algorithms. The median of the scores obtained by SAGA is expected to be different than the scores obtained by others. In order to show that the difference is significant, Wilcoxon two-sided signed rank test is carried out. The test has two input parameters; scores obtained by SAGA ($x$) and the score obtained by one of the deterministic methods ($y$). It performs a test of the null hypothesis that the vector $x$ comes from a continuous, symmetric distribution with a median equal to $y$. It is expected that the null hypothesis is rejected with $\alpha=0.05$ significance level which implies that SAGA generated scores are significantly different than the score generated by a deterministic method. The test is repeated for all deterministic methods; DTW, COW and PTW.
+
+However, it is worth to note that the evaluation method described above does not take into account for over-fitting of the data. A method may force a signal to fit to another at the expense of destroying the nature of the signals yet achieving a low score. Therefore for a realistic evaluation, an ``expert'' evaluation which involved manual analysis of alignment results by an expert is needed.
+
+\subsection{Parameters of the methods}
+The most important parameter of the SAGA is the number of B-spline bases of the weight function in the ODE model. It can also be regarded as the number of genes or the length of the chromosome/individual. A very small value results in a warping function not flexible enough to match the true warping function. On the contrary, a large value may increase the computational overhead. Its default value is empirically determined as $n=4$. For the experiments 3, 4, and 5 it is increased to 16,10, and 16 respectively since the default value is too small to create a warping path suitable for real world data. Selection, crossover and mutation functions are not changed in all experiments. The default values for the population size and the maximum number of generations are chosen as $20$ and $100$, respectively. However these two parameters are changed in real-world experiments namely 3, 4.1, 4.2 and 5.  
+
+DTW has three parameters; (1) the length of the ``transition rule", (2) the maximum number of consecutive horizontal or vertical transitions in the warping path and (3) the band width in percentage. The default values are $20$, $1$ and $10\%$, respectively. They are denoted as $T^{(20,1)}$ with  $10\%$ band width. The parameters of COW are (1) the length of segments and (2) the maximum range or degree of warping in the segment length. The parameters are denoted as  $T_{COW}^{(a,b)}$. While the optimal parameters of the SAGA and DTW are empirically determined, the parameters of COW are always determined by cross validation available in the tool provided by Tomasi \cite{Tomasi2004}. Finally, PTW has no parameters. 
+
+\subsection{Experiment 1}
+This experiment is carried out to observe the performance of the SAGA in a small scale with a known model function, $H$. To do this, a periodic model function, $H(s) = \sin(4\pi s)$ is selected to demonstrate the real world signals which are often periodic. Then two warping functions, $u_1$ and $u_2$ are created by solving the ODE model with the weight coefficient vectors  $\mathbf{c}_1=\{-1,1,-1,1\}$ and $\mathbf{c}_2=\{1,-1,1,-1\}$, respectively. The observed discrete signals, $f_1$ and $f_2$ are produced by
+\begin{eqnarray}
+  f_{1,i} & = & H \circ u_1 (t_i) \\
+  f_{2,i} & = & H \circ u_2 (t_i) 
+\end{eqnarray}
+where $t_i=(i-1)/(m-1)$ for $i\in[1\; m]\cap \mathbb{Z}$ and $m=100$. The model function, $H$, the warping functions, $u_1$ and $u_2$ and the signals, $f_1$ and $f_2$ are shown in Fig.~\ref{Figure03}. The parameters of the SAGA, DTW and COW are set to $n=4$, $T^{(1,1)}$ with $70\%$ band width and  $T_{COW}^{(10,6)}$, respectively. The population size and the maximum number of generations are set to 20 and 100, respectively.
+
+\begin{figure}
+\centering{\includegraphics[width=\columnwidth]{Figure03-crop.pdf}}
+\caption{Synthetic data used in Experiment 1. (a) Model function $H$ (b) Warping functions $u_1$ and $u_2$ (c) Observed signals $f_1$ and $f_2$  }
+\label{Figure03}
+\end{figure} 
+
+The resulting alignments are shown in Fig.~\ref{Figure04} with the alignment scores. Although DTW had the lowest alignment score, it produced a staircase pattern resulting non-smooth signals. COW failed to create a satisfying alignment, in spite of the optimized parameters for this experiment. PTW is also unable to align the two signals. The SAGA generates the best alignment with the second lowest alignment score.
+
+In addition to the alignment results, it is also helpful to discuss the performances of all the methods in terms of capturing the real warping functions. For this purpose, the true as well as the recovered warping functions by the SAGA, DTW, COW, and PTW are displayed in Fig.~\ref{Figure05}. The Ground Truth (GP) warping functions are chosen as $u_1^{-1}$ and $u_2^{-1}$ since the calculated warping functions, $v_1$ and $v_2$ are estimations to the inverse of the real warping functions.  In Fig.~\ref{Figure05}a and Fig.~\ref{Figure05}b, the first and the second warping functions are independently analysed. The plot in Fig.~\ref{Figure05}c is created by plotting the first signal in (a) against the second one in (b). It is worth to note that the SAGA produced a curve that fits very well to the GT in (c) in spite of the fact that it only makes approximation for the second warping function $u_2$.  This observation verifies the fact that one does not have to recover both warping functions to reach a satisfactory alignment. One can safely assume the first warping function to be identity and focus on the second one. In this way, the two input signals can still be aligned into a single signal as pointed out in the remark given in Section 3. 
+
+In Fig.~\ref{Figure05}c, the SAGA generates a very smooth curve catching the GT. Although DTW generated warping curve is also very close to the GT, the staircase patterns are prominent as in the alignment. COW and PTW cannot make satisfactory approximations to the GT although the latter produces a smooth function. These results explain why COW and PTW are unable to align these two signals.
+
+\begin{figure}[t]
+\centering{\includegraphics[width=0.8\columnwidth]{Figure04-crop.pdf}}
+\caption{The alignment results of Experiment 1 by the methods (a) SAGA, (b) DTW, (c) COW, and (d) PTW with the alignment scores. The lowest score is attained by DTW with the cost of forcing the signals into a staircase pattern. COW and PTW are also not able to produce visually appealing results. }
+\label{Figure04}
+\end{figure} 
+
+\begin{figure}
+\centering{\includegraphics[width=\columnwidth]{Figure05-crop.pdf}}
+\caption{In (a) and (b), ground truth warping functions, $u_1$ and $u_2$ are compared to the recovered warping functions, $v_1$ and $v_2$ respectively. In (c) the combination of warping functions are compared. The methods SAGA, COW and PTW assume $v_1$ to be an identity function while DTW aims to learn both functions. Please note that the curve generated by the SAGA fits to the ground truth in (c) even if this is not the case in (a) and (b).}
+\label{Figure05}
+\end{figure}
+
+\subsection{Experiment 2}
+This test illustrates the capacity of our method in global alignment in which more than two signals are aligned. First a model function $H(s) =\sin(4\pi s^2)$ is chosen. Then, $20$ different warping functions, $u_1,\ldots,u_{20}$, are randomly created by solving the ODE model with different weight coefficients. The observed signals, $f_i$, are produced by applying the warping functions to the model as
+\begin{equation}
+f_i(t_j) =H \circ u_i (t_j) 
+\end{equation}
+where $t_j=(j-1)/(m-1)$ for $j\in[1\; m]\cap \mathbb{Z}$ and $m=100$. The model, warping and target signals are shown in Fig.~\ref{Figure06}. 
+
+\begin{figure}
+\centering{\includegraphics[width=\columnwidth]{Figure06-crop.pdf}}
+\caption{(a) The model function, $H$, (b) the random warping functions, $u_i$, and (c) the observed signals, $f_i$ which are used for multiple alignment experiment in Experiment 2.  The alignment score of the observed signals is $0.418$. }
+\label{Figure06}
+\end{figure} 
+
+Multiple alignment is achieved by first creating a reference by averaging all the target signals. Each signal, $f_i$, is then aligned to the reference by pairwise alignment. In each alignment, warping is only applied to the observed signal hence the reference is unchanged. The alignment results are shown in Fig.~\ref{Figure07}. The parameters of the SAGA, DTW and COW are $n=4$, $T^{(4,1)}$ with $70\%$ band width and $T_{COW}^{(10,6)}$, respectively. The population size and the maximum number of generations are set to 20 and 100, respectively. It is easily observed that the SAGA generates the best alignment with lowest alignment score among all four methods.   This result indicates that SAGA can successfully learn complex warping functions as shown in Fig.\ref{Figure06}. 
+
+\begin{figure}
+\centering{\includegraphics[width=0.8\columnwidth]{Figure07-crop.pdf}}
+\caption{The signals, $f_i$, in Experiment 2 are aligned by the methods (a) SAGA, (b) DTW, (c) COW and (d) PTW.  Multiple alignment is achieved by first creating a reference signal by calculating the average and then aligning each signal to the reference. The SAGA generates the best alignment with lowest alignment score.}
+\label{Figure07}
+\end{figure} 
+
+Statistical significance tests are also carried out to check if SAGA produces significantly different alignments. For this purpose, SAGA is run $20$ times with different random realizations. Alignment scores of SAGA are then compared to the scores obtained by DTW, COW and PTW individually by means of Wilcoxon signed rank test. In all three tests, the null hypothesis is rejected with 5\% significance level which is a clear indication that the results of SAGA is significantly different than other three methods. 
+
+\subsection{Experiment 3}
+In the third experiment, two chromatogram signals provided by Tomasi \cite{Tomasi2004} are aligned in order to show that the SAGA can work with the real world data. The length of the chromatograms is $1,275$ and there are non-linear shifts between the chromatogram signals. They are aligned by the methods SAGA, DTW, COW and PTW. The parameters of the SAGA, DTW and COW are $n=16$,  $T^{(1,1)}$ with $70\%$ band width and  $T_{COW}^{(10,6)}$, respectively. In addition to that, the tolerance threshold, the population size, the range of the initial population and the maximum number of generations in Genetic Algorithm (GA) is set to $10^{-10}$, $80$, $[-0.01\;0.01]$ and $1000$, respectively due to the priori knowledge that the curvatures are not wildly changing in this dataset. The alignment results are presented in Fig.~\ref{Figure08}. The most $7$ significant peaks are located in the signals. The SAGA, DTW and COW resulted very similar alignments whereas PTW failed to align the peaks $3$, $6$ and $7$. 
+
+The effect of the alignment can also be observed by analysing the scores. The score of the original signals is calculated as $0.653$ whereas the SAGA lowers the score down to $0.157$ resulting almost $4$-fold improvement in the score. DTW attained the lowest score of $0.082$ at the expense of staircase patterns though the artefacts are not apparent because of the large flat regions.
+
+\begin{figure}
+\centering{\includegraphics[width=0.8\columnwidth]{Figure08-crop.pdf}}
+\caption{(a) The real world signals generated by gas chromatographic (GC) analysis of  two ground coffee extracts \cite{Tomasi2004}. The signals are aligned by the methods (b) SAGA, (c) DTW, (d) COW and (e) PTW. In (a) the location of the most $7$ significant peaks are specified in seconds while in others peaks are numbered from $1$ to $7$. All $7$ peaks are successfully aligned by the SAGA, DTW and COW while PTW is not able to align the peaks $3$, $6$ and $7$ properly. }
+\label{Figure08}
+\end{figure} 
+
+The warping paths are also presented in Fig.~\ref{Figure09}a. However, the wiggly nature of warping paths is not apparent in the plot since the drifts in the path are very small compared to the main diagonal. In order to see more detail, the warping paths are subtracted from the diagonal as shown in Fig.\ref{Figure09}b.  The first thing to take note of is the non-smooth warping paths generated by DTW and COW. The SAGA and PTW,  on the other hand,  produced very smooth warping functions as expected. PTW has failed in capturing the non-linear behaviour of time drifts verifying that a simple quadratic polynomial is not sufficient for this dataset. 
+
+
+
+\begin{figure}
+\centering{\includegraphics[width=0.8\columnwidth]{Figure09-crop.pdf}}
+\caption{(a) The warping paths generated by the SAGA, DTW, COW and PTW. Please note that it is not easy to discriminate the curves since they are very close to the main diagonal. (b) The curves in (a) are subtracted from the diagonal in order to better visualize the differences in the curvature. DTW and COW generate non-smooth curves whereas the SAGA and PTW produce smooth functions as they impose smooth models.}
+\label{Figure09}
+\end{figure} 
+
+\subsection{Experiment 4}
+We present the results of a set of experiments on real world data sets. The last experiment was conducted for pairwise alignment of two time series obtained by DNA sequencing of BRCA gene which is believed to play an important role in breast cancer. The first signal belongs to a person not having a mutation in BRCA gene while the second is obtained from a patient who is screened for possible mutations. This experiment is done in two steps; (1) a short segment from the beginning of the signals are aligned, (2) the whole signals are aligned. 
+
+\subsubsection{Experiment 4.1}
+In the first phase of the experiment, alignment performances of all the methods are studied by working with a relatively short segment taken from the original time series. For this purpose, the first $450$ points of the signals are used. The locations of all peaks are then manually determined to create a ground truth warping function explaining the amount of shifts between the two signals. In this way, it is verified that the time drifts occurred in this experiment are actually non-linear. The alignment results and the warping paths together with the ground truth are displayed in Fig.~\ref{Figure10} and Fig.~\ref{Figure11} respectively. Additionally, statistical significance tests are conducted to check if SAGA produces significantly different alignments. For this purpose, the problem is solved with SAGA $20$ times with different random seeds. The scores are then  compared to the scores obtained by deterministic methods using Wilcoxon signed rank test. In all three cases, the null hypothesis is rejected with 5\% significance level which indicates that SAGA produces significantly different alignments than other three methods. 
+
+In the alignments, DTW attains the lowest alignment score but it suffers from over-fitting which destroys the ``nature" of the signals by producing very strange ``slim'' peaks.  COW also destroys the smoothness of the original signals especially in the peaks, $2, 3, 5$ and $7$. The SAGA and PTW produce better alignments in spite of higher alignment scores than DTW and COW. The parameters of the SAGA, DTW and COW are $n=10$, $T^{(2,1)}$ with $70\%$ band width and $T_{COW}^{(10,6)}$, respectively. The population size, the maximum number of generations and the range of initial population are set to $20$, $100$, and $[0.01\;0.01]$, respectively.
+
+\begin{figure}
+\centering{\includegraphics[width=0.8\columnwidth]{Figure10-crop.pdf}}
+\caption{(a) The two signals are generated by DNA sequencing of BRCA gene of two individuals. Although the original signals have $4,500$ points,  here we take a short segment (first $450$ points) to be able to manually determine the real warping function by analysing every peak.  The signals are aligned by the methods (b) SAGA, (c) DTW, (d) COW and (e) PTW. }
+\label{Figure10}
+\end{figure} 
+
+The warping functions are also displayed in Fig.~\ref{Figure11}a. The GT warping function is obtained by mapping the coordinates of $12$ manually picked peaks in the first signal to the corresponding peaks in the second. It is not easy to discriminate the curves since they are very close to the main diagonal. Therefore they are subtracted from the diagonal to better visualize the curvatures of the paths. The GT curve verifies the fact that the warping functions in the real world experiments are in fact non-linear. DTW and COW generate non-smooth curves whereas the SAGA and PTW produce smooth functions as they impose smooth models. Although DTW and COW generate paths very close to the ground truth they suffer from over fitting as observed in Fig.~\ref{Figure10}c and Fig.~\ref{Figure10}d.
+\begin{figure}
+\centering{\includegraphics[width=0.8\columnwidth]{Figure11-crop.pdf}}
+\caption{(a) The warping paths generated by the methods SAGA, DTW, COW and PTW as well as the Ground Truth (GT). (b) The curves are subtracted from the diagonal in order to better visualize the differences in the curvature.}
+\label{Figure11}
+\end{figure} 
+
+\subsubsection{Experiment 4.2}
+In this experiment, the full length original BRCA signals are aligned using all of the four methods. The parameters of the SAGA, DTW and COW are chosen as $n=10$, $T^{(20,1)}$ with $10\%$ band width and  $T_{COW}^{(10,6)}$, respectively. The population size, the maximum number of generations and the range of initial population are set to $20$, $100$, and $[-0.01\;0.01]$, respectively. The alignments are displayed in Fig.~\ref{Figure12}. The SAGA, DTW and COW produced very similar alignments with very similar scores whereas PTW is unable to align any part of the signal because its warping function model is too simple to be able capture the underlying model. This observation coincides with the scores; PTW has failed to decrease the score, whereas the other three methods reduce the original score by almost 2-fold. 
+
+The warping paths are also displayed in Fig.~\ref{Figure13}. The paths are consistent with the alignment results. The SAGA, DTW and COW generates similar curves in the region $[500\;2500]$ which contains the most valuable information of the signals. On the other hand, PTW generated a polynomial with coefficients very close to zero explaining the failure in the alignment.
+
+\begin{figure}
+\centering{\includegraphics[width=0.8\columnwidth]{Figure12-crop.pdf}}
+\caption{(a) The two signals with $4,500$ points are generated by DNA sequencing of BRCA gene of two individuals. The signals are aligned by the methods (b) SAGA, (c) DTW, (d) COW and (e) PTW. While the SAGA, DTW and COW successfully align the signals with very close alignment scores, PTW is unable to learn the real warping function. }
+\label{Figure12}
+\end{figure} 
+
+\begin{figure}
+\centering{\includegraphics[width=0.8\columnwidth]{Figure13-crop.pdf}}
+\caption{(a) The warping paths generated by the methods SAGA, DTW, COW and PTW in Experiment 4.2. Please note that it is not easy to discriminate the curves since they are very close to the main diagonal.  (b) The curves are subtracted from the diagonal in order to better visualize the differences in the curvature.  The SAGA, DTW and COW worked well whereas PTW has failed.  Please note that the large variations occurred after the point $2,500$ are due to noise in the tail section of the signal.}
+\label{Figure13}
+\end{figure} 
+
+\subsection{Experiment 5}
+In this experiment, two DNA chromatograms belonging to the BRCA2 gene are aligned. This time the length of the signals is 11000 which is very high for DTW to work with. The parameters of the SAGA and COW are chosen as $n=16$ and  $T_{COW}^{(31,6)}$, respectively. The maximum number of generations and the population size is set to $1000$ and $80$ respectively regarding the length of the signals. In addition to that, the range of initial population and the tolerance threshold is set to $[-0.01\;0.01]$ and $10^{-10}$, respectively. The alignments are displayed in Fig.~\ref{Figure14}. The SAGA and COW produced similar alignments, yet COW achieves a lower score. PTW is unable to align any part of the signal. Although COW aligned the signals, it had difficulty in allocating the required memory and hence took much longer than SAGA. 
+
+\begin{figure}
+\centering{\includegraphics[width=0.8\columnwidth]{Figure14-crop.pdf}}
+\caption{(a) The two DNA chromatograms with $11,500$ points. The signals are aligned by the methods (b) SAGA, (c) COW and (d) PTW. }
+\label{Figure14}
+\end{figure} 
+
+
+\subsection{Summary of results}
+In the first experiment, two short signals with known warping functions are aligned to compare the performance of our method to the well known methods, DTW, COW and PTW. The SAGA is able to align those signals and successfully capture the real warping function.  The second experiment is conducted to test the method on multiple alignment benchmark for which our method SAGA is verified to be very effective. In the third experiment, the methods are tested on a real data set for which all methods except PTW produced similar yet satisfactory alignments. In the fourth experiment, another real data set is used to test all methods. In the first step of this experiment, a short segment from the signal is used. In this step, the GT warping function is determined manually to verify that it is non-linear.  While the SAGA, DTW and COW produce similar and successful alignments, PTW has failed again. In the second step of the last experiment, the full length signals are used. The SAGA, DTW and COW align the signals successfully while PTW has failed.
+
+In all the experiments, DTW suffers from overfitting which usually results in distortions in the aligned signals. In other words, the signals are forced to be aligned. Hence, the  evaluation scores obtained by DTW are almost always below the ones produced by other methods. Another drawback of DTW is the quadratic space complexity which makes it inconvenient to work with long signals as shown in the last experiment. COW produces smoother alignments than DTW especially in the first and second experiments. In other experiments, staircase patterns caused by DTW or COW are not prominent. 
+
+\section{Discussion and future work}
+In this study, a novel signal alignment algorithm called Signal Alignment based on Genetic Algorithm (SAGA) is introduced in order to align a set of time series by correcting the time drifts. The warping function is modelled by an ODE coupled with B-spline weight function and the resulting unconstrained optimization problem is solved by genetic algorithm. The performance of the proposed method is compared with the well known methods, DTW, COW and PTW by five different set of experiments. 
+
+In the light of the experiments, one can safely claim that DTW and COW suffer from sharp corners in the warping paths leading to stair-case patterns in the alignments. These patterns are prominent especially in the first and second experiments. SAGA and PTW, on the other hand, have no such problem since the smoothness property is already imposed in the formulation of both methods. Moreover, regarding the warping functions obtained by the methods, SAGA generated warping functions can be regarded as the smoothed versions of DTW generated warping functions.
+
+The experiments clearly indicate that the time drifts occurring in real-world signals can be non-linear which can be observed in the ground truth warping function obtained by manually measuring the peak locations on both signals. This proves that a simple linear shift is not enough to create an alignment. The warping paths are also more complex than a simple quadratic function which explains the inefficiency of PTW. A clear advantage of the proposed method is linear time and space complexity as opposed to DTW and COW which has quadratic and cubic complexities, respectively.
+
+SAGA can also be used for multiple alignment provided that a suitable reference is given or calculated. The mean profile is sufficient for multiple signal alignment but it is assumed that all the signals belong to a single class which may not be true in general. It might be necessary diving them into groups by clustering and then aligning each group independently as proposed in CLUE-TIPS \cite{Akella2009}.
+
+The number of B-spline bases used in the ODE model is a very important parameter in SAGA. It is empirically determined for each experiment. A very small value results a warping function not flexible enough to match the true warping function. On the contrary, a large value may increase the computational overhead. Therefore it is necessary to make a wise choice. A solution would be to add this variable to the design parameters so that it is evolved throughout the alignment process. A better strategy would be to include a preprocessing step to estimate this value in the beginning and keep it fixed in later stages.
+
+A distinct advantage of our approach is the definition of our fitness function which allows us to use any unconstrained optimization procedure to find the best warping function. In this study we used Genetic Algorithm because of its simplicity and high availability. However one can try recent evolutionary methods.
+
+%Alignment evaluation scores should not be used to reach a quick decision about the ``goodness'' of alignment. An alignment result may have a lower score but the result may not be acceptable as in the Figure~\ref{Figure10} where DTW generated alignment has the lowest score but suffers from overfitting. The peaks are forced to align at the expense of a visible distortion. Therefore trusting a single score in judging the quality of alignment is not advised. A better solution would be to observe the effects of different alignments in later stages. For instance, different techniques can be used to align DNA sequences and their performances can be evaluated in terms of mutation screening results.
+
+%\bibliographystyle{IEEEbib}
+\bibliographystyle{model1b-num-names}
+%\bibliography{references}
+
+\begin{thebibliography}{28}
+\expandafter\ifx\csname natexlab\endcsname\relax\def\natexlab#1{#1}\fi
+\providecommand{\bibinfo}[2]{#2}
+\ifx\xfnm\relax \def\xfnm[#1]{\unskip,\space#1}\fi
+%Type = Article
+\bibitem[{Aberg et~al.(2009)Aberg, Alm and Torgrip}]{Aberg2009}
+\bibinfo{author}{K.M. Aberg}, \bibinfo{author}{E.~Alm}, \bibinfo{author}{R.J.O.
+  Torgrip}, \bibinfo{title}{{The correspondence problem for metabonomics
+  datasets}}, \bibinfo{journal}{{Analytical and Bioanalytical Chemistry}}
+  \bibinfo{volume}{{394}} (\bibinfo{year}{{2009}}) \bibinfo{pages}{{151--162}}.
+%Type = Article
+\bibitem[{Akella et~al.(2009)Akella, Rejtar, Orazine, Hincapie and
+  Hancock}]{Akella2009}
+\bibinfo{author}{L.M. Akella}, \bibinfo{author}{T.~Rejtar},
+  \bibinfo{author}{C.~Orazine}, \bibinfo{author}{M.~Hincapie},
+  \bibinfo{author}{W.S. Hancock}, \bibinfo{title}{{CLUE-TIPS, Clustering
+  methods for pattern analysis of LC-MS data}}, \bibinfo{journal}{{Journal of
+  Proteome Research}} \bibinfo{volume}{{8}} (\bibinfo{year}{{2009}})
+  \bibinfo{pages}{{4732--4742}}.
+%Type = Article
+\bibitem[{Auger(2005)}]{Auger2005}
+\bibinfo{author}{A.~Auger}, \bibinfo{title}{{Convergence results for the (1,
+  $\lambda$)-SA-ES using the theory of $\varphi$-irreducible Markov chains}},
+  \bibinfo{journal}{Theoretical Computer Science} \bibinfo{volume}{334}
+  (\bibinfo{year}{2005}) \bibinfo{pages}{35 -- 69}.
+%Type = Book
+\bibitem[{Bellman(2003)}]{Bellman2003}
+\bibinfo{author}{R.~Bellman}, \bibinfo{title}{Dynamic Programming},
+  \bibinfo{publisher}{Dover Publications, Inc.}, \bibinfo{year}{2003}.
+%Type = Article
+\bibitem[{Bonfield et~al.(1998)Bonfield, Rada and Staden}]{Bonfield1998}
+\bibinfo{author}{J.~Bonfield}, \bibinfo{author}{C.~Rada},
+  \bibinfo{author}{R.~Staden}, \bibinfo{title}{{Automated detection of point
+  mutations using fluorescent sequence trace subtraction}},
+  \bibinfo{journal}{{Nucleic Acids Research}} \bibinfo{volume}{{26}}
+  (\bibinfo{year}{{1998}}) \bibinfo{pages}{{3404--3409}}.
+%Type = Article
+\bibitem[{Bylund et~al.(2002)Bylund, Danielsson, Malmquist and
+  Markides}]{Bylund2002}
+\bibinfo{author}{D.~Bylund}, \bibinfo{author}{R.~Danielsson},
+  \bibinfo{author}{G.~Malmquist}, \bibinfo{author}{K.~Markides},
+  \bibinfo{title}{{Chromatographic alignment by warping and dynamic programming
+  as a pre-processing tool for PARAFAC modelling of liquid chromatography-mass
+  spectrometry data}}, \bibinfo{journal}{{Journal of Chromatography A}}
+  \bibinfo{volume}{{961}} (\bibinfo{year}{{2002}}) \bibinfo{pages}{{237--244}}.
+%Type = Article
+\bibitem[{Crowe(2005)}]{Crowe2005}
+\bibinfo{author}{M.~Crowe}, \bibinfo{title}{{SeqDoC: Rapid SNP and mutation
+  detection by direct comparison of DNA sequence chromatograms}},
+  \bibinfo{journal}{{BMC Bioinformatics}} \bibinfo{volume}{{6}}
+  (\bibinfo{year}{{2005}}).
+%Type = Article
+\bibitem[{Eilers(2004)}]{Eilers2004}
+\bibinfo{author}{P.H.C. Eilers}, \bibinfo{title}{{Parametric time warping}},
+  \bibinfo{journal}{{Analytical Chemistry}} \bibinfo{volume}{{76}}
+  (\bibinfo{year}{{2004}}) \bibinfo{pages}{{404--411}}.
+%Type = Article
+\bibitem[{Ewing et~al.(1998)Ewing, Hillier, Wendl and Green}]{Ewing1998}
+\bibinfo{author}{B.~Ewing}, \bibinfo{author}{L.~Hillier},
+  \bibinfo{author}{M.~Wendl}, \bibinfo{author}{P.~Green},
+  \bibinfo{title}{{Base-calling of automated sequencer traces using {Phred}. I.
+  Accuracy assessment}}, \bibinfo{journal}{{Genome Research}}
+  \bibinfo{volume}{{8}} (\bibinfo{year}{{1998}}) \bibinfo{pages}{{175--185}}.
+%Type = Article
+\bibitem[{Kwong et~al.(1996)Kwong, Chau and Halang}]{Kwong1996}
+\bibinfo{author}{S.~Kwong}, \bibinfo{author}{C.W. Chau}, \bibinfo{author}{W.A.
+  Halang}, \bibinfo{title}{Genetic algorithm for optimizing the nonlinear time
+  alignment of automatic speech recognition systems},
+  \bibinfo{journal}{Industrial Electronics, IEEE Transactions on}
+  \bibinfo{volume}{43} (\bibinfo{year}{1996}) \bibinfo{pages}{559 --566}.
+%Type = Phdthesis
+\bibitem[{Listgarten(2007)}]{Listgarten2007a}
+\bibinfo{author}{J.~Listgarten}, \bibinfo{title}{Analysis of Sibling Time
+  Series Data: Alignment and Difference Detection}, Ph.D. thesis, University of
+  Toronto, \bibinfo{year}{2007}.
+%Type = Inproceedings
+\bibitem[{Listgarten et~al.(2005)Listgarten, Neal, Roweis and
+  Emili}]{Listgarten2005}
+\bibinfo{author}{J.~Listgarten}, \bibinfo{author}{R.M. Neal},
+  \bibinfo{author}{S.T. Roweis}, \bibinfo{author}{A.~Emili},
+  \bibinfo{title}{Multiple alignment of continuous time series}, in:
+  \bibinfo{booktitle}{Advances in Neural Information Processing Systems},
+  \bibinfo{publisher}{MIT Press}, \bibinfo{year}{2005}, pp.
+  \bibinfo{pages}{817--824}.
+%Type = Article
+\bibitem[{Manaster et~al.(2005)Manaster, Zheng, Teuber, Wachter, Doring,
+  Schreiber and Hampe}]{Manaster2005}
+\bibinfo{author}{C.~Manaster}, \bibinfo{author}{W.~Zheng},
+  \bibinfo{author}{M.~Teuber}, \bibinfo{author}{S.~Wachter},
+  \bibinfo{author}{F.~Doring}, \bibinfo{author}{S.~Schreiber},
+  \bibinfo{author}{J.~Hampe}, \bibinfo{title}{{InSNP: A tool for automated
+  detection and visualization of SNPs and InDels}}, \bibinfo{journal}{{Human
+  Mutation}} \bibinfo{volume}{{26}} (\bibinfo{year}{{2005}})
+  \bibinfo{pages}{{11--19}}.
+%Type = Article
+\bibitem[{Mott(1998)}]{Mott1998}
+\bibinfo{author}{R.~Mott}, \bibinfo{title}{{Trace alignment and some of its
+  applications}}, \bibinfo{journal}{{Bioinformatics}} \bibinfo{volume}{{14}}
+  (\bibinfo{year}{{1998}}) \bibinfo{pages}{{92--97}}.
+%Type = Article
+\bibitem[{Nickerson et~al.(1997)Nickerson, Tobe and Taylor}]{Nickerson1997}
+\bibinfo{author}{D.~Nickerson}, \bibinfo{author}{V.~Tobe},
+  \bibinfo{author}{S.~Taylor}, \bibinfo{title}{{PolyPhred: Automating the
+  detection and genotyping of single nucleotide substitutions using
+  fluorescence-based resequencing}}, \bibinfo{journal}{{Nucleic Acids
+  Research}} \bibinfo{volume}{{25}} (\bibinfo{year}{{1997}})
+  \bibinfo{pages}{{2745--2751}}.
+%Type = Article
+\bibitem[{Nielsen et~al.(1998)Nielsen, Carstensen and Smedsgaard}]{Nielsen1998}
+\bibinfo{author}{N.P.V. Nielsen}, \bibinfo{author}{J.M. Carstensen},
+  \bibinfo{author}{J.~Smedsgaard}, \bibinfo{title}{Aligning of single and
+  multiple wavelength chromatographic profiles for chemometric data analysis
+  using correlation optimised warping}, \bibinfo{journal}{Journal of
+  Chromatography A} \bibinfo{volume}{805} (\bibinfo{year}{1998})
+  \bibinfo{pages}{17 -- 35}.
+%Type = Article
+\bibitem[{Ramsay(1998)}]{Ramsay1998a}
+\bibinfo{author}{J.O. Ramsay}, \bibinfo{title}{{Estimating smooth monotone
+  functions}}, \bibinfo{journal}{{Journal of the Royal Statistical Society
+  Series B-statistical Methodology}} \bibinfo{volume}{{60}}
+  (\bibinfo{year}{{1998}}) \bibinfo{pages}{{365--375}}.
+%Type = Article
+\bibitem[{Ramsay and Li(1998)}]{Ramsay1998}
+\bibinfo{author}{J.O. Ramsay}, \bibinfo{author}{X.C. Li},
+  \bibinfo{title}{{Curve registration}}, \bibinfo{journal}{{Journal of the
+  Royal Statistical Society Series B-statistical Methodology}}
+  \bibinfo{volume}{{60}} (\bibinfo{year}{{1998}}) \bibinfo{pages}{{351--363}}.
+%Type = Article
+\bibitem[{Robinson et~al.(2007)Robinson, {De Souza}, Keen, Saunders,
+  McConville, Speed and Likic}]{Robinson2007}
+\bibinfo{author}{M.D. Robinson}, \bibinfo{author}{D.P. {De Souza}},
+  \bibinfo{author}{W.W. Keen}, \bibinfo{author}{E.C. Saunders},
+  \bibinfo{author}{M.J. McConville}, \bibinfo{author}{T.P. Speed},
+  \bibinfo{author}{V.A. Likic}, \bibinfo{title}{{A dynamic programming approach
+  for the alignment of signal peaks in multiple gas chromatography-mass
+  spectrometry experiments}}, \bibinfo{journal}{{BMC Bioinformatics}}
+  \bibinfo{volume}{{8}} (\bibinfo{year}{{2007}}).
+%Type = Article
+\bibitem[{Sakoe and Chiba(1978)}]{Sakoe1978}
+\bibinfo{author}{H.~Sakoe}, \bibinfo{author}{S.~Chiba},
+  \bibinfo{title}{{Dynamic-programming algorithm optimization for spoken word
+  recognition}}, \bibinfo{journal}{{IEEE Transactions on Acoustics Speech and
+  Signal Processing}} \bibinfo{volume}{{26}} (\bibinfo{year}{{1978}})
+  \bibinfo{pages}{{43--49}}.
+%Type = Article
+\bibitem[{Salvadora and Chan(2007)}]{Salvadora2007}
+\bibinfo{author}{S.~Salvadora}, \bibinfo{author}{P.~Chan},
+  \bibinfo{title}{{Toward accurate dynamic time warping in linear time and
+  space}}, \bibinfo{journal}{{Intelligent Data Analysis}}
+  \bibinfo{volume}{{11}} (\bibinfo{year}{{2007}}) \bibinfo{pages}{{561--580}}.
+%Type = Article
+\bibitem[{Sanger et~al.(1977)Sanger, Nicklen and Coulson}]{Sanger1977}
+\bibinfo{author}{F.~Sanger}, \bibinfo{author}{S.~Nicklen},
+  \bibinfo{author}{A.~Coulson}, \bibinfo{title}{{DNA} sequencing with
+  chain-terminating inhibitors}, \bibinfo{journal}{{ Proceedings of The
+  National Academy of Sciences of The United States Of America}}
+  \bibinfo{volume}{{74}} (\bibinfo{year}{{1977}})
+  \bibinfo{pages}{{5463--5467}}.
+%Type = Phdthesis
+\bibitem[{Smith(2009)}]{Smith2009}
+\bibinfo{author}{A.A. Smith}, \bibinfo{title}{Classification and alignment of
+  gene-expression time-series data}, Ph.D. thesis, University of
+  Wisconsin-Madison, \bibinfo{year}{2009}.
+%Type = Article
+\bibitem[{Smith et~al.(2009)Smith, Vollrath, Bradfield and Craven}]{Smith2009A}
+\bibinfo{author}{A.A. Smith}, \bibinfo{author}{A.~Vollrath},
+  \bibinfo{author}{C.A. Bradfield}, \bibinfo{author}{M.~Craven},
+  \bibinfo{title}{Clustered alignments of gene-expression time series data},
+  \bibinfo{journal}{Bioinformatics} \bibinfo{volume}{25} (\bibinfo{year}{2009})
+  \bibinfo{pages}{i119--i127}.
+%Type = Article
+\bibitem[{Thalange et~al.(1996)Thalange, Foster, Gill, Price and
+  Clayton}]{Thalange1996}
+\bibinfo{author}{N.K.S. Thalange}, \bibinfo{author}{P.J. Foster},
+  \bibinfo{author}{M.S. Gill}, \bibinfo{author}{D.A. Price},
+  \bibinfo{author}{P.E. Clayton}, \bibinfo{title}{Model of normal prepubertal
+  growth}, \bibinfo{journal}{Archives of Disease in Childhood}
+  \bibinfo{volume}{75} (\bibinfo{year}{1996}) \bibinfo{pages}{427--431}.
+%Type = Article
+\bibitem[{Tomasi et~al.(2004)Tomasi, van~den Berg and Andersson}]{Tomasi2004}
+\bibinfo{author}{G.~Tomasi}, \bibinfo{author}{F.~van~den Berg},
+  \bibinfo{author}{C.~Andersson}, \bibinfo{title}{{Correlation optimized
+  warping and dynamic time warping as preprocessing methods for chromatographic
+  data}}, \bibinfo{journal}{{Journal of Chemometrics}} \bibinfo{volume}{{18}}
+  (\bibinfo{year}{{2004}}) \bibinfo{pages}{{231--241}}.
+%Type = Article
+\bibitem[{Walczak and Wu(2005)}]{Walczak2005}
+\bibinfo{author}{B.~Walczak}, \bibinfo{author}{W.~Wu}, \bibinfo{title}{Fuzzy
+  warping of chromatograms}, \bibinfo{journal}{Chemometrics and Intelligent
+  Laboratory Systems} \bibinfo{volume}{77} (\bibinfo{year}{2005})
+  \bibinfo{pages}{173--180}.
+%Type = Article
+\bibitem[{Yuan et~al.(2011)Yuan, Chen, Ni, Xu, Tang, Vingron, Somel and
+  Khaitovich}]{Yuan2011}
+\bibinfo{author}{Y.~Yuan}, \bibinfo{author}{Y.P.P. Chen},
+  \bibinfo{author}{S.~Ni}, \bibinfo{author}{A.G. Xu},
+  \bibinfo{author}{L.~Tang}, \bibinfo{author}{M.~Vingron},
+  \bibinfo{author}{M.~Somel}, \bibinfo{author}{P.~Khaitovich},
+  \bibinfo{title}{{Development and application of a modified dynamic time
+  warping algorithm (DTW-S) to analyses of primate brain expression time
+  series}}, \bibinfo{journal}{BMC Bioinformatics} \bibinfo{volume}{12}
+  (\bibinfo{year}{2011}).
+
+\end{thebibliography}
+
+
+\end{document}
